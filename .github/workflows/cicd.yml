@@ -26,10 +26,10 @@ jobs:
 
       - name: Update Deployment YAML
         run: |
-          sed -i "s|image: .*/student-backend:.*|image:docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/backend-deployment.yaml
+          sed -i "s|image: .*/student-backend:.*|image:docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/student-backend-deploy.yaml
 
       - name: Commit & push changes
         uses: EndBug/add-and-commit@v9
         with:
           message: "Update student-backend image to ${{ github.sha }}"
-          add: "k8s/backend-deployment.yaml"
+          add: "k8s/student-backend-deploy.yaml"
