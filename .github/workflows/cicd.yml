@@ -9,15 +9,60 @@ permissions:
   contents: write
 
 jobs:
-  build-and-deploy:
+  ci-cd:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.USER_TOKEN }}   
+          token: ${{ secrets.USER_TOKEN }}
 
+      # -----------------
+      # 1. Lint
+      # -----------------
+      - name: Run Linter
+        uses: github/super-linter@v5
+        env:
+          VALIDATE_ALL_CODEBASE: false
+          GITHUB_TOKEN: ${{ secrets.USER_TOKEN }}
+
+      # -----------------
+      # 2. SAST (CodeQL)
+      # -----------------
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+      # -----------------
+      # 3. SCA (Dependency Scan)
+      # -----------------
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v3
+
+      # -----------------
+      # 4. Unit Tests
+      # -----------------
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run Unit Tests
+        run: pytest --maxfail=1 --disable-warnings -q
+
+      # -----------------
+      # 5. Build + Push Backend Image
+      # -----------------
       - name: Log in to DockerHub
         uses: docker/login-action@v2
         with:
@@ -29,11 +74,17 @@ jobs:
           docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} ./student-attendance-backend
           docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}
 
+      # -----------------
+      # 6. Build + Push Frontend Image
+      # -----------------
       - name: Build and push frontend image
         run: |
           docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} ./student-attendance-frontend
           docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}
 
+      # -----------------
+      # 7. Update K8s Manifests
+      # -----------------
       - name: Update backend manifest
         run: |
           sed -i "s|image:.*student-backend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/student-backend-deploy.yml
@@ -42,6 +93,9 @@ jobs:
         run: |
           sed -i "s|image:.*student-frontend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}|g" k8s/student-frontend-deploy.yml
 
+      # -----------------
+      # 8. Commit Changes
+      # -----------------
       - name: Commit updated manifests
         run: |
           git config user.name "github-actions[bot]"
