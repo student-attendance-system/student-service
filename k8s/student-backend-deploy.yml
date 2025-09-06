@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: student-backend
-        image:docker.io/gunjan1603/student-backend:c209207b3ec901cc69bc9403be111d43b6e7eeaa
+        image:docker.io/gunjan1603/student-backend:eed081866b298cf6f265afbb551b0e4f5f94e9bb
         ports:
         - containerPort: 8000
         env:
