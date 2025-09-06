@@ -91,11 +91,13 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build & Push Backend
         run: |
-          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} -f student-attendance-backend/Dockerfile .
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} \
+            -f student-attendance-backend/Dockerfile student-attendance-backend
           docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}
       - name: Build & Push Frontend
         run: |
-          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} -f student-attendance-frontend/Dockerfile .
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} \
+            -f student-attendance-frontend/Dockerfile student-attendance-frontend
           docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}
 
   deploy:
