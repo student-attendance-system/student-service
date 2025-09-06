@@ -15,6 +15,7 @@ jobs:
       - name: Lint YAML
         uses: ibiqlik/action-yamllint@v3
         with:
+          config_file: .yamllint.yml
           file_or_dir: ".github/workflows/"
 
   sast:
@@ -29,8 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd student-attendance-backend
-          composer install --no-interaction \
-            --no-progress --prefer-dist
+          composer install --no-interaction --no-progress --prefer-dist
       - name: Install PHPStan
         run: |
           cd student-attendance-backend
@@ -38,8 +38,7 @@ jobs:
       - name: Run PHPStan Analysis
         run: |
           cd student-attendance-backend
-          vendor/bin/phpstan analyse src \
-            --level=3 --no-progress --memory-limit=1G
+          vendor/bin/phpstan analyse src --level=3 --no-progress --memory-limit=1G
 
   sca:
     runs-on: ubuntu-latest
@@ -53,8 +52,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd student-attendance-backend
-          composer install --no-interaction \
-            --no-progress --prefer-dist
+          composer install --no-interaction --no-progress --prefer-dist
       - name: Run Composer Audit (SCA)
         run: |
           cd student-attendance-backend
@@ -72,8 +70,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd student-attendance-backend
-          composer install --no-interaction \
-            --no-progress --prefer-dist
+          composer install --no-interaction --no-progress --prefer-dist
       - name: Run PHPUnit
         run: |
           cd student-attendance-backend
@@ -130,5 +127,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/*.yml
-          git commit -m "Update images to ${{ github.sha }}"
+          git commit -m "Update images to ${{ github.sha }}" || echo "No changes to commit"
           git push
