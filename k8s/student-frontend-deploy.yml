@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: student-frontend
+  template:
+    metadata:
+      labels:
+        app: student-frontend
+    spec:
+      containers:
+      - name: student-frontend
+        image: gunjan1603/student-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 20
