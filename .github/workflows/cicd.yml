@@ -9,14 +9,20 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Lint YAML
-        uses: ibiqlik/action-yamllint@v3
-        with:
-          config_file: .yamllint.yml
-          file_or_dir: ".github/workflows/"
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v3
+    - name: Lint YAML
+      uses: ibiqlik/action-yamllint@v3
+      with:
+        file_or_dir: ".github/workflows/"
+        strict: true
+        config_data: |
+          extends: default
+          rules:
+            line-length: disable
+            truthy: disable
+            document-start: disable
 
   sast:
     runs-on: ubuntu-latest
