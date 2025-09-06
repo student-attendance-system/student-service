@@ -26,7 +26,7 @@ jobs:
 
       - name: Update Deployment YAML
         run: |
-          sed -i "s|image: .*/student-backend:.*|image:docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" manifests/backend-deployment.yaml
+          sed -i "s|image: .*/student-backend:.*|image:docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/backend-deployment.yaml
 
       - name: Commit & push changes
         uses: EndBug/add-and-commit@v9
