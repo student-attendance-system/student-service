@@ -106,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.USER_TOKEN }}
       - name: Update backend manifest
         run: sed -i "s|image:.*student-backend:.*|image:docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/student-backend-deploy.yml
       - name: Update frontend manifest
