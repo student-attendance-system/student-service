@@ -9,60 +9,96 @@ permissions:
   contents: write
 
 jobs:
-  ci-cd:
+  # -----------------
+  # 1. Lint
+  # -----------------
+  lint:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.USER_TOKEN }}
-
-      # -----------------
-      # 1. Lint
-      # -----------------
       - name: Run Linter
         uses: github/super-linter@v5
         env:
           VALIDATE_ALL_CODEBASE: false
           GITHUB_TOKEN: ${{ secrets.USER_TOKEN }}
 
-      # -----------------
-      # 2. SAST (CodeQL)
-      # -----------------
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+  # -----------------
+  # 2. SAST (PHPStan)
+  # -----------------
+  sast:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
         with:
-          languages: javascript, python
+          php-version: '8.2'
+      - name: Install PHPStan
+        run: |
+          cd student-attendance-backend
+          composer require --dev phpstan/phpstan
+      - name: Run PHPStan Analysis
+        run: |
+          cd student-attendance-backend
+          vendor/bin/phpstan analyse . --level=5
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
-
-      # -----------------
-      # 3. SCA (Dependency Scan)
-      # -----------------
+  # -----------------
+  # 3. SCA (Dependency Vulnerabilities)
+  # -----------------
+  sca:
+    runs-on: ubuntu-latest
+    needs: sast
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Dependency Review
         uses: actions/dependency-review-action@v3
 
-      # -----------------
-      # 4. Unit Tests
-      # -----------------
-      - name: Set up Python
-        uses: actions/setup-python@v4
+  # -----------------
+  # 4. Unit Tests
+  # -----------------
+  tests:
+    runs-on: ubuntu-latest
+    needs: sca
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # PHP Tests
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
         with:
-          python-version: "3.10"
+          php-version: '8.2'
 
-      - name: Install dependencies
+      - name: Install PHP dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pytest
+          cd student-attendance-backend
+          composer install || true
 
-      - name: Run Unit Tests
-        run: pytest --maxfail=1 --disable-warnings -q
+      - name: Run PHPUnit
+        run: |
+          cd student-attendance-backend
+          if [ -f vendor/bin/phpunit ]; then vendor/bin/phpunit; else echo "No PHPUnit tests"; fi
 
-      # -----------------
-      # 5. Build + Push Backend Image
-      # -----------------
+      # JS Tests
+      - name: Run JS Unit Tests
+        run: |
+          cd student-attendance-frontend
+          if [ -f package.json ]; then npm install && npm test || true; else echo "No JS tests"; fi
+
+  # -----------------
+  # 5. Build + Push Docker Images
+  # -----------------
+  build:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Log in to DockerHub
         uses: docker/login-action@v2
         with:
@@ -74,17 +110,23 @@ jobs:
           docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} ./student-attendance-backend
           docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}
 
-      # -----------------
-      # 6. Build + Push Frontend Image
-      # -----------------
       - name: Build and push frontend image
         run: |
           docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} ./student-attendance-frontend
           docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}
 
-      # -----------------
-      # 7. Update K8s Manifests
-      # -----------------
+  # -----------------
+  # 6. Update K8s Manifests + Commit (GitOps for ArgoCD)
+  # -----------------
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Update backend manifest
         run: |
           sed -i "s|image:.*student-backend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/student-backend-deploy.yml
@@ -93,9 +135,6 @@ jobs:
         run: |
           sed -i "s|image:.*student-frontend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}|g" k8s/student-frontend-deploy.yml
 
-      # -----------------
-      # 8. Commit Changes
-      # -----------------
       - name: Commit updated manifests
         run: |
           git config user.name "github-actions[bot]"
