@@ -32,4 +32,4 @@ jobs:
         uses: EndBug/add-and-commit@v9
         with:
           message: "Update student-backend image to ${{ github.sha }}"
-          add: "manifests/backend-deployment.yaml"
+          add: "k8s/backend-deployment.yaml"
