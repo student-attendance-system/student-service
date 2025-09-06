@@ -1,15 +1,13 @@
+---
 name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
   pull_request:
-    branches: [ main ]
+    branches: ["main"]
 
 jobs:
-  # -------------------
-  # 1. Lint (basic checks)
-  # -------------------
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -19,78 +17,63 @@ jobs:
         with:
           file_or_dir: ".github/workflows/"
 
-  # -------------------
-  # 2. SAST (PHPStan for PHP)
-  # -------------------
   sast:
     runs-on: ubuntu-latest
     needs: lint
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-
+          php-version: "8.2"
       - name: Install dependencies
         run: |
           cd student-attendance-backend
-          composer install --no-interaction --no-progress --prefer-dist
-
+          composer install --no-interaction \
+            --no-progress --prefer-dist
       - name: Install PHPStan
         run: |
           cd student-attendance-backend
           composer require --dev phpstan/phpstan
-
       - name: Run PHPStan Analysis
         run: |
           cd student-attendance-backend
-          vendor/bin/phpstan analyse src --level=3 --no-progress --memory-limit=1G
+          vendor/bin/phpstan analyse src \
+            --level=3 --no-progress --memory-limit=1G
 
-  # -------------------
-  # 3. SCA (Dependency scan with Composer Audit)
-  # -------------------
   sca:
     runs-on: ubuntu-latest
     needs: sast
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-
+          php-version: "8.2"
       - name: Install dependencies
         run: |
           cd student-attendance-backend
-          composer install --no-interaction --no-progress --prefer-dist
-
+          composer install --no-interaction \
+            --no-progress --prefer-dist
       - name: Run Composer Audit (SCA)
         run: |
           cd student-attendance-backend
           composer audit || true
 
-  # -------------------
-  # 4. Unit Tests (PHPUnit)
-  # -------------------
   tests:
     runs-on: ubuntu-latest
     needs: sca
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-
+          php-version: "8.2"
       - name: Install dependencies
         run: |
           cd student-attendance-backend
-          composer install --no-interaction --no-progress --prefer-dist
-
+          composer install --no-interaction \
+            --no-progress --prefer-dist
       - name: Run PHPUnit
         run: |
           cd student-attendance-backend
@@ -100,50 +83,48 @@ jobs:
             echo "No PHPUnit tests found, skipping..."
           fi
 
-  # -------------------
-  # 5. Build & Push Docker
-  # -------------------
   build:
     runs-on: ubuntu-latest
     needs: tests
     steps:
       - uses: actions/checkout@v3
-
       - name: Log in to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Build & Push Backend
         run: |
-          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} -f student-attendance-backend/Dockerfile .
-          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}
-
+          docker build -t \
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} \
+            -f student-attendance-backend/Dockerfile .
+          docker push \
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}
       - name: Build & Push Frontend
         run: |
-          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} -f student-attendance-frontend/Dockerfile .
-          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}
+          docker build -t \
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} \
+            -f student-attendance-frontend/Dockerfile .
+          docker push \
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}
 
-  # -------------------
-  # 6. Deploy (Update manifests for ArgoCD)
-  # -------------------
   deploy:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GH_PAT }}   # personal access token for push
-
+          token: ${{ secrets.GH_PAT }}
       - name: Update backend manifest
         run: |
-          sed -i "s|image:.*student-backend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" k8s/student-backend-deploy.yml
-
+          sed -i \
+            "s|image:.*student-backend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}|g" \
+            k8s/student-backend-deploy.yml
       - name: Update frontend manifest
         run: |
-          sed -i "s|image:.*student-frontend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}|g" k8s/student-frontend-deploy.yml
-
+          sed -i \
+            "s|image:.*student-frontend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}|g" \
+            k8s/student-frontend-deploy.yml
       - name: Commit & Push changes
         run: |
           git config --global user.name "github-actions[bot]"
@@ -151,4 +132,3 @@ jobs:
           git add k8s/*.yml
           git commit -m "Update images to ${{ github.sha }}"
           git push
-
