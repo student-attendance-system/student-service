@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: student-frontend
-        image:docker.io/gunjan1603/student-frontend:d9c693092f56249623429fb48a20655856ba04ab
+        image:docker.io/gunjan1603/student-frontend:0aa1a7145cd69bc34074a95c9a41c9cae5bc2250
         ports:
         - containerPort: 80
         resources:
