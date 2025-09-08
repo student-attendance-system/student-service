@@ -130,10 +130,9 @@ jobs:
 
       - name: Run DAST scan using ZAP Docker
         run: |
-          docker pull owasp/zap2docker-stable:latest
-          docker run --rm -t owasp/zap2docker-stable:latest zap-full-scan.py \
-            -t http://54.173.121.237:30003 -r dast-report.html
-
+          docker pull ghcr.io/zaproxy/zaproxy:stable
+          docker run --rm -v "$(pwd)":/zap/wrk/:rw -t ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py -t http://public_ip:30003 -r /zap/wrk/dast-report.html
       - name: Upload DAST report
         uses: actions/upload-artifact@v4
         with:
