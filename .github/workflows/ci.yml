@@ -1,0 +1,102 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Lint YAML
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: ".github/workflows/"
+          strict: true
+          config_data: |
+            extends: default
+            rules:
+              line-length: disable
+              truthy: disable
+              document-start: disable
+
+  sast:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+        working-directory: student-attendance-backend
+      - name: Install PHPStan
+        run: composer require --dev phpstan/phpstan
+        working-directory: student-attendance-backend
+      - name: Run PHPStan Analysis
+        run: vendor/bin/phpstan analyse src --level=3 --no-progress --memory-limit=1G
+        working-directory: student-attendance-backend
+
+  sca:
+    runs-on: ubuntu-latest
+    needs: sast
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+        working-directory: student-attendance-backend
+      - name: Run Composer Audit (SCA)
+        run: composer audit || true
+        working-directory: student-attendance-backend
+
+  tests:
+    runs-on: ubuntu-latest
+    needs: sca
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+        working-directory: student-attendance-backend
+      - name: Run PHPUnit
+        run: |
+          if [ -f vendor/bin/phpunit ]; then
+            vendor/bin/phpunit --testdox
+          else
+            echo "No PHPUnit tests found, skipping..."
+          fi
+        working-directory: student-attendance-backend
+
+  build:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v3
+      - name: Log in to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & Push Backend
+        run: |
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }} \
+            -f student-attendance-backend/Dockerfile student-attendance-backend
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-backend:${{ github.sha }}
+      - name: Build & Push Frontend
+        run: |
+          docker build -t docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }} \
+            -f student-attendance-frontend/Dockerfile student-attendance-frontend
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/student-frontend:${{ github.sha }}
