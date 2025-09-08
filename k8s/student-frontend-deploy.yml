@@ -11,6 +11,9 @@ spec:
     metadata:
       labels:
         app: student-frontend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
     spec:
       containers:
       - name: student-frontend
